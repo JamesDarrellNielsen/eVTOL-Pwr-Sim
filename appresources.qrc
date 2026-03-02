@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/images"/>
+    <qresource prefix="/">
+        <file>../../Users/james/OneDrive/Desktop/Joby/Joby-Lockup-Blue-and-Dark-Grey-featured-1.png</file>
+    </qresource>
+</RCC>
