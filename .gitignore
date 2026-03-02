@@ -10,11 +10,15 @@ object_script.*.Release
 object_script.*.Debug
 *_plugin_import.cpp
 Makefile*
+.qtcreator
 
 # Build directories (adjust as needed if you use a specific build directory name)
 *build-*
 debug/
 release/
+build/
+tests/
+deploy/
 
 # Generated files
 *.moc
