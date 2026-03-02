@@ -1,0 +1,35 @@
+# Qt Creator temporary files and build artifacts
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*creator.user*
+.qmake.cache
+.qmake.stash
+object_script.*.Release
+object_script.*.Debug
+*_plugin_import.cpp
+Makefile*
+
+# Build directories (adjust as needed if you use a specific build directory name)
+*build-*
+debug/
+release/
+
+# Generated files
+*.moc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+*.qm
+*.prl
+
+# Other common files to ignore
+*.dll
+*.dylib
+*.swp
+*.autosave
+compile_commands.json
