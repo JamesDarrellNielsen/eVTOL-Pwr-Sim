@@ -1,7 +1,5 @@
 #include "evtolpwrsim.h"
 #include "ui_evtolpwrsim.h"
-#include "evtolvehicle.h"
-
 #include <QStandardItemModel>
 #include <QStringList>
 #include <vector>
@@ -34,149 +32,259 @@ void eVtolPwrSim::extracted(QStringList &rowData,
 }
 
 void eVtolPwrSim::on_runPwrSimBtn_clicked() {
-    // Setup Data & UI
+    // 1. Disable the button so the user doesn't spam-click it
+    ui->runPwrSimBtn->setEnabled(false);
+    ui->simReportHdr->setText("Simulation running in background...");
 
-    // Main thread RNG for initial setup
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    // 2. Setup the FutureWatcher to notify us when the work is done
+    auto watcher = new QFutureWatcher<void>(this);
 
-    // 1. Data Initialization
-    std::vector<EVTOLVehicle::CompanySpecs> fleetSpecs = {
-                                                          {"Alpha", 120, 320, 0.6, 1.6, 4, 0.25},
-                                                          {"Bravo", 100, 100, 0.2, 1.5, 5, 0.10},
-                                                          {"Charlie", 160, 220, 0.8, 2.2, 3, 0.05},
-                                                          {"Delta", 90, 120, 0.62, 0.8, 2, 0.22},
-                                                          {"Echo", 150, 30, 0.3, 5.8, 2, 0.61}};
+    // Connect the 'finished' signal to our results-handling function
+    connect(watcher, &QFutureWatcher<void>::finished, this, &eVtolPwrSim::handleSimFinished);
+    // Ensure the watcher is deleted automatically after it's done
+    connect(watcher, &QFutureWatcher<void>::finished, watcher, &QFutureWatcher<void>::deleteLater);
 
-    // Random Distribution of 20 vehicles
-    std::vector<int> counts(5, 0);
-    for (int i = 0; i < 20; ++i) {
-        counts[std::uniform_int_distribution<>(0, 4)(gen)]++;
-    }
+    /* 3. Wrap the simulation in QtConcurrent::run
+     * This launches the entire multi-threaded block you wrote earlier
+     * but does NOT block the UI while waiting for join(). */
+    QFuture<void> future = QtConcurrent::run([this]() {
 
-    std::vector<EVTOLModel> vehicles;
-    std::vector<EVTOLVehicle::Stats> stats(5);
+        // ... [Paste your existing simulation code here] ...
+        // ... [Include the thread launching loop and the t.join() loop] ...
 
-    for (int i = 0; i < 5; ++i) {
-        for (int j = 0; j < counts[i]; ++j) {
-            vehicles.push_back(EVTOLModel(fleetSpecs[i]));
+        /* Note: After the t.join() loop finishes in this background thread,
+         * the 'stats' and 'counts' must be accessible to handleSimFinished.
+         * You may want to make 'stats' and 'counts' class members. */
+        // Setup Data & UI
+
+        // Main thread RNG for initial setup
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        // 1. Data Initialization
+        // 1. Initialize the SHARED class members (don't redeclare 'std::vector' here!)
+        fleetSpecs = {
+                      {"Alpha", 120, 320, 0.6, 1.6, 4, 0.25},
+                      {"Bravo", 100, 100, 0.2, 1.5, 5, 0.10},
+                      {"Charlie", 160, 220, 0.8, 2.2, 3, 0.05},
+                      {"Delta", 90, 120, 0.62, 0.8, 2, 0.22},
+                      {"Echo", 150, 30, 0.3, 5.8, 2, 0.61}};
+
+        // Random Distribution of 20 vehicles
+        // std::vector<int> counts(5, 0);
+        counts.assign(5, 0); // Reset counts to zero
+        for (int i = 0; i < 20; ++i) {
+            counts[std::uniform_int_distribution<>(0, 4)(gen)]++;
         }
-    }
 
-    // Simulation Parameters
-    double simTimeLimit = 3.0; // 3 hours
+        std::vector<EVTOLModel> vehicles;
+        //std::vector<EVTOLVehicle::Stats> stats(5);
+        stats.assign(5, EVTOLVehicle::Stats()); // Reset stats for new run
 
-    // Shared Resources
-    std::priority_queue<double, std::vector<double>, std::greater<double>> chargers;
-    for (int i = 0; i < 3; ++i)
-        chargers.push(0.0);
-
-    // Mutexes for synchronization
-    std::mutex chargerMutex;
-    std::mutex statsMutex;
-
-    // Thread Container
-    std::vector<std::thread> threads;
-
-    // Run Simulation
-    for (unsigned long i = 0; i < vehicles.size(); ++i) {
-        // Launch a thread for each vehicle
-        threads.emplace_back([&, i]() {
-            // Each thread needs its own Random Number Generator to be thread-safe
-            std::random_device threadRd;
-            std::mt19937 threadGen(threadRd());
-
-            double currentTime = 0;
-            int typeIdx = -1;
-            for (int k = 0; k < 5; ++k)
-                if (vehicles[i].specs.name == fleetSpecs[k].name)
-                    typeIdx = k;
-
-            // Local accumulation variables to minimize mutex locking duration
-            double localFlightTime = 0;
-            double localDistance = 0;
-            double localPassMiles = 0;
-            int localFlights = 0;
-            int localFaults = 0;
-            double localChargeTime = 0;
-            int localCharges = 0;
-
-            while (currentTime < simTimeLimit) {
-                // --- FLIGHT PHASE ---
-                double flightDuration = vehicles[i].getFlightDuration();
-                double actualFlight =
-                    std::min(flightDuration, simTimeLimit - currentTime);
-
-                if (actualFlight <= 0)
-                    break;
-
-                double distance = actualFlight * vehicles[i].specs.cruiseSpeed;
-
-                // Update Local Stats
-                localFlightTime += actualFlight;
-                localDistance += distance;
-                localPassMiles += (distance * vehicles[i].specs.passengers);
-                localFlights++;
-
-                // Random Faults (Thread-safe generation)
-                std::bernoulli_distribution faultDist(vehicles[i].specs.faultProb * actualFlight);
-                if (faultDist(threadGen))
-                    localFaults++;
-
-                currentTime += actualFlight;
-
-                // --- CHARGING PHASE ---
-                if (currentTime < simTimeLimit) {
-                    double startCharge = 0;
-                    double endCharge = 0;
-
-                    // LOCK: Accessing shared Charger Queue
-                    {
-                        std::lock_guard<std::mutex> lock(chargerMutex);
-                        double chargerReadyTime = chargers.top();
-                        chargers.pop();
-
-                        startCharge = std::max(currentTime, chargerReadyTime);
-                        endCharge = startCharge + vehicles[i].specs.chargeTime;
-
-                        // Push the new availability time back immediately so others can see it
-                        chargers.push(endCharge);
-                    } // UNLOCK
-
-                    double actualChargeTime =
-                        std::min(endCharge, simTimeLimit) - startCharge;
-
-                    if (actualChargeTime > 0) {
-                        localChargeTime += actualChargeTime;
-                        localCharges++;
-                    }
-
-                    currentTime = endCharge;
-                }
+        for (int i = 0; i < 5; ++i) {
+            for (int j = 0; j < counts[i]; ++j) {
+                vehicles.push_back(EVTOLModel(fleetSpecs[i]));
             }
-
-            // LOCK: Merging local thread stats into global stats vector
-            {
-                std::lock_guard<std::mutex> lock(statsMutex);
-                stats[typeIdx].totalFlightTime += localFlightTime;
-                stats[typeIdx].totalDistance += localDistance;
-                stats[typeIdx].totalPassengerMiles += localPassMiles;
-                stats[typeIdx].flightCount += localFlights;
-                stats[typeIdx].totalFaults += localFaults;
-                stats[typeIdx].totalChargeTime += localChargeTime;
-                stats[typeIdx].chargeCount += localCharges;
-            } // UNLOCK
-        });
-    }
-
-    // Wait for all threads to finish
-    for (auto &t : threads) {
-        if (t.joinable()) {
-            t.join();
         }
-    }
 
-    // Initialize the model (UI Logic - runs on main thread after simulation)
+        // Simulation Parameters
+        double simTimeLimit = 3.0; // 3 hours
+
+        // Shared Resources
+        std::priority_queue<double, std::vector<double>, std::greater<double>> chargers;
+        for (int i = 0; i < 3; ++i)
+            chargers.push(0.0);
+
+        // Mutexes for synchronization
+        std::mutex chargerMutex;
+        std::mutex statsMutex;
+
+        // Thread Container
+        std::vector<std::thread> threads;
+
+        // --- RUN SIMULATION ---
+        // We iterate through the 'vehicles' vector (20 vehicles).
+        // Each iteration launches a separate thread to simulate that vehicle's 3-hour journey in parallel cores.
+        for (unsigned long i = 0; i < vehicles.size(); ++i) {
+
+            /* THREADING & LAMBDA EXPLAINED:
+         * threads.emplace_back(...) constructs a std::thread object directly inside the vector.
+         * The `[&, i]` is a "Capture Clause":
+         *   - `&`: Capture by reference. This gives the thread access to shared objects like 'chargers',
+         *          'stats', and 'mutexes' defined in the main function's scope.
+         *   - `i`: Capture by value. We pass the current loop index so each thread knows exactly
+         *          which vehicle in the vector it is responsible for.
+         * The `() { ... }` is the Lambda Body—the actual code the thread will execute. */
+            threads.emplace_back([&, i]() {
+
+                /* THREAD-SAFE RANDOMNESS:
+             * We initialize a local RNG inside the thread. If we used the global 'gen' from the main thread,
+             * the program would likely crash because 'std::mt19937' is not thread-safe.
+             * 'threadRd' gets a seed from the hardware, and 'threadGen' generates the sequence. */
+                std::random_device threadRd;
+                std::mt19937 threadGen(threadRd());
+
+                double currentTime = 0; // The vehicle's personal "clock" (starts at hour 0.0)
+                int typeIdx = -1;       // Used to map this vehicle back to its Company for final stats
+
+                // Identify the company index by comparing the vehicle name to the fleet list
+                for (int k = 0; k < 5; ++k)
+                    if (vehicles[i].specs.name == fleetSpecs[k].name)
+                        typeIdx = k;
+
+                /* OPTIMIZATION - LOCAL ACCUMULATORS:
+             * We store stats in local variables first. Locking a mutex is "expensive" (slows down the CPU).
+             * By using local variables, the thread only locks the global 'statsMutex' ONCE at the
+             * very end, rather than every time the vehicle flies or charges. */
+                double localFlightTime = 0;
+                double localDistance = 0;
+                double localPassMiles = 0;
+                int localFlights = 0;
+                int localFaults = 0;
+                double localChargeTime = 0;
+                int localCharges = 0;
+
+                // Discrete Event Loop: Continue until the vehicle's clock reaches the 3-hour limit
+                while (currentTime < simTimeLimit) {
+
+                    // --- FLIGHT PHASE ---
+                    // getFlightDuration() returns how long the battery lasts (e.g., 0.5 hours).
+                    double flightDuration = vehicles[i].getFlightDuration();
+
+                    /* THE MIN FUNCTION (std::min):
+                 * Logic: actualFlight = min(Battery Life, Remaining Sim Time).
+                 * If a battery lasts 1 hour, but only 0.2 hours are left in the simulation,
+                 * the vehicle only flies for 0.2 hours. This prevents the "over-flying" bug. */
+                    double actualFlight = std::min(flightDuration, simTimeLimit - currentTime);
+
+                    if (actualFlight <= 0) break; // Exit loop if no time remains
+
+                    // Physics: Distance = Speed * Time
+                    double distance = actualFlight * vehicles[i].specs.cruiseSpeed;
+
+                    // Log the local statistics for this flight segment
+                    localFlightTime += actualFlight;
+                    localDistance += distance;
+                    localPassMiles += (distance * vehicles[i].specs.passengers);
+                    localFlights++;
+
+                    /* BERNOULLI DISTRIBUTION:
+                 * Think of this as a "weighted coin flip."
+                 * vehicles[i].specs.faultProb is the chance of failure per hour.
+                 * By multiplying it by 'actualFlight', we scale the risk to the length of the flight.
+                 * faultDist(threadGen) returns 'true' if the "coin" lands on a fault. */
+                    std::bernoulli_distribution faultDist(vehicles[i].specs.faultProb * actualFlight);
+                    if (faultDist(threadGen))
+                        localFaults++;
+
+                    // Advance the vehicle's clock forward by the time spent in the air
+                    currentTime += actualFlight;
+
+                    // --- CHARGING PHASE ---
+                    // This block executes only if there is still time left in the 3-hour simulation window.
+                    if (currentTime < simTimeLimit) {
+                        double startCharge = 0;
+                        double endCharge = 0;
+
+                        /* MUTEX & PRIORITY QUEUE LOGIC:
+                     * A Mutex is a "talking stick." Only one thread can hold it at a time.
+                     * The 'chargers' priority queue is a "Min-Heap."
+                     * .top() always gives us the charger that is finishing its work the soonest. */
+                        {
+                            // lock_guard ensures that no other thread modifies 'chargers' while we are.
+                            std::lock_guard<std::mutex> lock(chargerMutex);
+
+                            // Get the earliest available time a charger is free
+                            double chargerReadyTime = chargers.top();
+                            chargers.pop(); // Remove it from the queue (we are now using it)
+
+                            /* WAITING LOGIC (std::max):
+                         * If the vehicle arrives at 1.0 but the charger isn't free until 1.2,
+                         * the vehicle MUST wait until 1.2.
+                         * If the vehicle arrives at 1.5 but the charger was free at 1.2,
+                         * the vehicle starts immediately at 1.5. */
+                            startCharge = std::max(currentTime, chargerReadyTime);
+                            endCharge = startCharge + vehicles[i].specs.chargeTime;
+
+                            // Put the charger back in the queue with its NEW free-time (endCharge)
+                            chargers.push(endCharge);
+
+                        } // Mutex is released here. Other threads can now access the queue.
+
+                        // Calculate the actual charge received before the 3-hour global cutoff
+                        double actualChargeTime = std::min(endCharge, simTimeLimit) - startCharge;
+
+                        if (actualChargeTime > 0) {
+                            localChargeTime += actualChargeTime;
+                            localCharges++;
+                        }
+
+                        /* Advance the vehicle's personal clock to the the point that it finishes
+                     * charging, or would have finished charging. */
+                        currentTime = endCharge;
+                    }
+                }
+
+                /* FINAL STATS MERGE:
+             * Now that the 3-hour simulation is over for this specific vehicle,
+             * we lock the global stats once to add our local totals to the company-wide totals. */
+                {
+                    std::lock_guard<std::mutex> lock(statsMutex);
+                    stats[typeIdx].totalFlightTime += localFlightTime;
+                    stats[typeIdx].totalDistance += localDistance;
+                    stats[typeIdx].totalPassengerMiles += localPassMiles;
+                    stats[typeIdx].flightCount += localFlights;
+                    stats[typeIdx].totalFaults += localFaults;
+                    stats[typeIdx].totalChargeTime += localChargeTime;
+                    stats[typeIdx].chargeCount += localCharges;
+                }
+            }); // End of Thread Lambda
+        }
+
+        /*  --- THREAD SYNCHRONIZATION (The "Wait" Phase) ---
+     *  This loop causes program execution to wait for all threads to finish ensuring the main program
+     *  doesn't try to show results before the vehicles are actually done flying and charging in their
+     *  background threads.
+
+     THE 'auto' KEYWORD:
+    * 'auto' tells the compiler to automatically deduce the data type of the variable 't'.
+    * Since 'threads' is a std::vector<std::thread>, the compiler knows 't' is a 'std::thread'.
+    * The '&' (reference) is vital: it prevents the code from trying to "copy" the thread
+    * object (which is illegal in C++). It points directly to the existing thread in the vector. */
+        for (auto &t : threads) {
+
+            /* t.joinable() is a safety check. A thread is "joinable" if it has been started and hasn't
+         * been "joined" or "detached" yet. Attempting to join a thread that isn't joinable will cause
+         * the program to crash with a 'std::system_error'. This check ensures the thread is valid to wait on. */
+            if (t.joinable()) {
+
+                /* t.join():
+             * This is a "blocking" call. It tells the main thread (the UI thread):
+             * "Stop right here and wait until this specific vehicle thread ('t') finishes
+             * its 3-hour simulation loop."
+             *
+             * Without join(), the main thread would zoom past this loop, try to calculate
+             * averages with zeros or incomplete data, and display an empty table while
+             * the background threads were still crunching numbers.
+             *
+             * Once t.join() returns, we are 100% certain that the vehicle's data has
+             * been safely moved into the global 'stats' vector via the mutex. */
+                t.join();
+            }
+        }
+    }); // end of QFuture
+
+    // 4. Give the future to the watcher to start monitoring
+    watcher->setFuture(future);
+}
+
+void eVtolPwrSim::handleSimFinished() {
+    // This code runs on the MAIN UI THREAD once all background threads are joined.
+    ui->runPwrSimBtn->setEnabled(true);
+    ui->simReportHdr->setText("Simulation Complete!");
+
+    // ... [Paste your QStandardItemModel and table population logic here] ...
+    // Initialize the model (UI Logic - runs on main UI thread after the simulation)
     if (ui->simReportHdr)
         ui->simReportHdr->setText("eVTOL Simulation Results (3 Hours, 20 Vehicles)");
 

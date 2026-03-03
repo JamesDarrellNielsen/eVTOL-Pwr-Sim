@@ -10,16 +10,22 @@ object_script.*.Release
 object_script.*.Debug
 *_plugin_import.cpp
 Makefile*
+<<<<<<< HEAD
 .qtcreator
 CMakeLists.txt
+=======
+>>>>>>> 3fb775a7fcc1c4447928b57d51d1e574ca62aaea
 
 # Build directories (adjust as needed if you use a specific build directory name)
 *build-*
 debug/
 release/
+<<<<<<< HEAD
 build/
-tests/
+tests/build
 deploy/
+=======
+>>>>>>> 3fb775a7fcc1c4447928b57d51d1e574ca62aaea
 
 # Generated files
 *.moc
@@ -36,4 +42,9 @@ ui_*.h
 *.dll
 *.dylib
 *.swp
+<<<<<<< HEAD
 *.autosave
+=======
+*.autosave
+compile_commands.json
+>>>>>>> 3fb775a7fcc1c4447928b57d51d1e574ca62aaea
