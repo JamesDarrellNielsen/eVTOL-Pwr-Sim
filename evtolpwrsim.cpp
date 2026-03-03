@@ -71,7 +71,6 @@ eVtolPwrSim::~eVtolPwrSim()
     delete ui;
 }
 
-
 /*
  * THE EXTRACTED HELPER FUNCTION
  * This function converts a list of strings into a list of QStandardItems.
@@ -315,10 +314,10 @@ void eVtolPwrSim::on_runPwrSimBtn_clicked() {
                     localFlights++;
 
                     /* BERNOULLI DISTRIBUTION:
-                 * Think of this as a "weighted coin flip."
-                 * vehicles[i].specs.faultProb is the chance of failure per hour.
-                 * By multiplying it by 'actualFlight', we scale the risk to the length of the flight.
-                 * faultDist(threadGen) returns 'true' if the "coin" lands on a fault. */
+                    * Think of this as a "weighted coin flip."
+                    * vehicles[i].specs.faultProb is the chance of failure per hour.
+                    * By multiplying it by 'actualFlight', we scale the risk to the length of the flight.
+                    * faultDist(threadGen) returns 'true' if the "coin" lands on a fault. */
                     std::bernoulli_distribution faultDist(vehicles[i].specs.faultProb * actualFlight);
                     if (faultDist(threadGen))
                         localFaults++;
@@ -333,9 +332,9 @@ void eVtolPwrSim::on_runPwrSimBtn_clicked() {
                         double endCharge = 0;
 
                         /* MUTEX & PRIORITY QUEUE LOGIC:
-                     * A Mutex is a "talking stick." Only one thread can hold it at a time.
-                     * The 'chargers' priority queue is a "Min-Heap."
-                     * .top() always gives us the charger that is finishing its work the soonest. */
+                        * A Mutex is a "talking stick." Only one thread can hold it at a time.
+                        * The 'chargers' priority queue is a "Min-Heap."
+                        * .top() always gives us the charger that is finishing its work the soonest. */
                         {
                             // lock_guard ensures that no other thread modifies 'chargers' while we are.
                             std::lock_guard<std::mutex> lock(chargerMutex);
@@ -345,10 +344,10 @@ void eVtolPwrSim::on_runPwrSimBtn_clicked() {
                             chargers.pop(); // Remove it from the queue (we are now using it)
 
                             /* WAITING LOGIC (std::max):
-                         * If the vehicle arrives at 1.0 but the charger isn't free until 1.2,
-                         * the vehicle MUST wait until 1.2.
-                         * If the vehicle arrives at 1.5 but the charger was free at 1.2,
-                         * the vehicle starts immediately at 1.5. */
+                            * If the vehicle arrives at 1.0 but the charger isn't free until 1.2,
+                            * the vehicle MUST wait until 1.2.
+                            * If the vehicle arrives at 1.5 but the charger was free at 1.2,
+                            *  the vehicle starts immediately at 1.5. */
                             startCharge = std::max(currentTime, chargerReadyTime);
                             endCharge = startCharge + vehicles[i].specs.chargeTime;
 
@@ -366,14 +365,14 @@ void eVtolPwrSim::on_runPwrSimBtn_clicked() {
                         }
 
                         /* Advance the vehicle's personal clock to the the point that it finishes
-                     * charging, or would have finished charging. */
+                        * charging, or would have finished charging. */
                         currentTime = endCharge;
                     }
                 }
 
                 /* FINAL STATS MERGE:
-             * Now that the 3-hour simulation is over for this specific vehicle,
-             * we lock the global stats once to add our local totals to the company-wide totals. */
+                * Now that the 3-hour simulation is over for this specific vehicle,
+                * we lock the global stats once to add our local totals to the company-wide totals. */
                 {
                     std::lock_guard<std::mutex> lock(statsMutex);
                     stats[typeIdx].totalFlightTime += localFlightTime;
@@ -388,20 +387,20 @@ void eVtolPwrSim::on_runPwrSimBtn_clicked() {
         }
 
         /*  --- THREAD SYNCHRONIZATION (The "Wait" Phase) ---
-     *  This loop causes program execution to wait for all threads to finish ensuring the main program
-     *  doesn't try to show results before the vehicles are actually done flying and charging in their
-     *  background threads.
+        *  This loop causes program execution to wait for all threads to finish ensuring the main program
+        *  doesn't try to show results before the vehicles are actually done flying and charging in their
+        *  background threads.
 
-     THE 'auto' KEYWORD:
-    * 'auto' tells the compiler to automatically deduce the data type of the variable 't'.
-    * Since 'threads' is a std::vector<std::thread>, the compiler knows 't' is a 'std::thread'.
-    * The '&' (reference) is vital: it prevents the code from trying to "copy" the thread
-    * object (which is illegal in C++). It points directly to the existing thread in the vector. */
+        THE 'auto' KEYWORD:
+        * 'auto' tells the compiler to automatically deduce the data type of the variable 't'.
+        * Since 'threads' is a std::vector<std::thread>, the compiler knows 't' is a 'std::thread'.
+        * The '&' (reference) is vital: it prevents the code from trying to "copy" the thread
+        * object (which is illegal in C++). It points directly to the existing thread in the vector. */
         for (auto &t : threads) {
 
             /* t.joinable() is a safety check. A thread is "joinable" if it has been started and hasn't
-         * been "joined" or "detached" yet. Attempting to join a thread that isn't joinable will cause
-         * the program to crash with a 'std::system_error'. This check ensures the thread is valid to wait on. */
+            * been "joined" or "detached" yet. Attempting to join a thread that isn't joinable will cause
+            * the program to crash with a 'std::system_error'. This check ensures the thread is valid to wait on. */
             if (t.joinable()) {
 
                 /* t.join():
@@ -429,7 +428,6 @@ void eVtolPwrSim::handleSimFinished() {
     ui->runPwrSimBtn->setEnabled(true);
     ui->simReportHdr->setText("Simulation Complete!");
 
-    // ... [Paste your QStandardItemModel and table population logic here] ...
     // Initialize the model (UI Logic - runs on main UI thread after the simulation)
     if (ui->simReportHdr)
         ui->simReportHdr->setText("eVTOL Simulation Results (3 Hours, 20 Vehicles)");
