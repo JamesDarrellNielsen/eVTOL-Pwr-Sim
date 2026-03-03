@@ -1,63 +1,120 @@
-#include <QtTest>
-#include "../evtolvehicle.h"
+#include <QtTest> // Main header for the Qt Test framework (provides QVERIFY, QCOMPARE, etc.)
+#include "../evtolvehicle.h" // Include your logic header (relative path to the vehicle class)
 
+/*
+ * All Qt tests must be a class inheriting from QObject.
+ * The test runner uses Qt's Meta-Object System to find and execute functions.
+ */
 class TestEVTOL : public QObject
 {
-    Q_OBJECT
+    Q_OBJECT /* Mandatory macro to enable the meta-object
+                features required for test discovery */
 
 private slots:
-    // --- SMOKE TESTS (Sanity Checks) ---
-
+    /*
+     * initTestCase()
+     * Runs exactly ONCE before any of the test functions start.
+     * Used for global setup like database connections or logging initialization.
+     */
     void initTestCase() {
         qDebug() << "Initializing QMake Test Suite...";
     }
-
+    /*
+     * Smoke tests verify that the most basic functions work
+     * (like object creation). If these fail, there is no point
+     * running more complex tests.
+     */
     void smokeTest_Instantiation() {
         // Can we create the object without crashing?
+        // Prepare dummy data for the constructor
         EVTOLVehicle::CompanySpecs specs = {"Smoke", 100, 100, 1, 1, 1, 0};
+        // Instantiate the object being tested
         EVTOLModel vehicle(specs);
 
+        /* QCOMPARE(actual, expected)
+         * Compares two values. If they differ, the test fails and reports
+         * exactly what both values were.
+         * Note: std::string must be compared carefully with QString. */
         QCOMPARE(vehicle.specs.name, std::string("Smoke"));
+
+        /* QVERIFY(condition)
+         * Evaluates a boolean. Fails if the condition is false.
+         * Best for simple non-zero or null-pointer checks. */
         QVERIFY(vehicle.specs.batteryCap > 0);
     }
 
-    // --- UNIT TESTS (Logic Verification) ---
-
+    /*
+     * Unit tests isolate specific logic (like math formulas) to ensure
+     * the code produces the correct output for a given input.
+     */
     void unitTest_FlightCalc() {
+        // Scenario: 1000 kWh Battery / (100 mph * 2.0 kWh/mi) = 5.0 hours
         // Formula: Time = Battery / (Speed * Energy)
         // Data: 1000 / (100 * 2) = 5.0 hours
         EVTOLVehicle::CompanySpecs specs = {"Unit", 100, 1000, 1, 2.0, 1, 0};
         EVTOLModel vehicle(specs);
-
+        /* qFuzzyCompare(val1, val2)
+         * CRITICAL CONCEPT: Never use '==' with floating-point numbers (double/float)
+         * due to precision errors. qFuzzyCompare checks if they are "close enough."
+         */
         QVERIFY(qFuzzyCompare(vehicle.getFlightDuration(), 5.0));
     }
 
+    /*
+     * Boundary/Safety Testing
+     * Checks how the code handles "Edge Cases" like division by zero.
+     */
     void unitTest_ZeroSpeedSafety() {
-        // If speed is 0, result should be 0 (not infinity/NaN)
+        /* If speed is 0, the math might try to divide by zero and the
+         * result should be 0 (not infinity/NaN) */
         EVTOLVehicle::CompanySpecs specs = {"Safety", 0, 100, 1, 1, 1, 0};
         EVTOLModel vehicle(specs);
-
+        // Ensures the code returns 0.0 instead of 'inf' or 'NaN' (Not a Number)
         QCOMPARE(vehicle.getFlightDuration(), 0.0);
     }
 
-    // --- REGRESSION TESTS (Fixed Scenarios) ---
-
+     /* Regression tests  are fixed scenarios designed to ensure
+      * that previously working requirements don't break when you
+      * add new features (like threading).
+      */
     void regressionTest_AlphaProfile() {
-        // "Alpha" Profile from requirements
-        // 320 kWh, 120 mph, 1.6 kWh/mi
-        // Expected: 1.66666...
+        /* Using the exact "Alpha" Company specs from requirements
+         * 320 kWh, 120 mph, 1.6 kWh/mi
+         * Expected: 1.66666...
+         */
         EVTOLVehicle::CompanySpecs alpha = {"Alpha", 120, 320, 0.6, 1.6, 4, 0.25};
         EVTOLModel vehicle(alpha);
 
         double expected = 1.6666666666666667;
+
+        /* qAbs(...) < epsilon
+         * An alternative to qFuzzyCompare. We check if the difference is
+         * smaller than a very tiny threshold (0.00001).
+         */
         QVERIFY(qAbs(vehicle.getFlightDuration() - expected) < 0.00001);
     }
-
+    /*
+     * cleanupTestCase()
+     * Runs exactly ONCE after all tests have finished.
+     * Used to close files or free memory allocated in initTestCase.
+     */
     void cleanupTestCase() {
         qDebug() << "Tests Finished.";
     }
 };
 
+/*
+ * QTEST_APPLESS_MAIN
+ * This macro creates a main() function for the test executable.
+ * "APPLESS" means it doesn't create a [QApplication](https://doc.qt.io),
+ * making it faster for non-GUI logic tests.
+ */
 QTEST_APPLESS_MAIN(TestEVTOL)
 
+/*
+ * #include "tst_evtoltests.moc"
+ * This line is vital for .cpp files containing Q_OBJECT tests.
+ * It tells the compiler to include the code generated by the Meta-Object Compiler,
+ * allowing the test runner to "see" your private slots.
+ */
 #include "tst_evtoltests.moc"
