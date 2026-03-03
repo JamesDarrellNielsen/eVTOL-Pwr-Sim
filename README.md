@@ -85,7 +85,6 @@ Final Averaging (Post-Simulation)
 		               Total Flight Count
 					   
 Output results from one run:
-
 Company   Count  Avg Flight  Avg Dist  Avg Charge  Faults PAX Miles
 Alpha     4      1.17143     140.571   0.6         2      3936
 Bravo     4      0.575       57.5      0.2         0      2300
