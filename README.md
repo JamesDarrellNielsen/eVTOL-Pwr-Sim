@@ -85,15 +85,8 @@ Final Averaging (Post-Simulation)
 		               Total Flight Count
 					   
 Output results from one run:
-Company   Count  Avg Flight  Avg Dist  Avg Charge  Faults PAX Miles
-Alpha     4      1.17143     140.571   0.6         2      3936
-Bravo     4      0.575       57.5      0.2         0      2300
-Charlie   4      0.625       100       0.666667    0      1200
-Delta     3      1.66667     150       0.2         1      900
-Echo      5      0.0344828   5.17241   0.133333    0      51.7241
 
 ![Alt text](https://github.com/JamesDarrellNielsen/eVTOL-Pwr-Sim/blob/main/images/EVTOLPwrSimResults.png)
-
 
 **** Appedix **** 
 eVTOL SIMULATION ASSIGNMENT:
@@ -108,15 +101,7 @@ Problem Statement
 There are five companies developing eVTOL aircraft. The vehicle produced by each 
 manufacturer has different characteristics. Six distinct properties are laid out in the below table: 
 
-Company Name:               Alpha  Bravo  Charlie  Delta  Echo 
-Cruise Speed (mph):         120    100    160      90     30
-Battery Capacity (kWh):     320    100    220      120    150 
-Time to Charge (hrs):       0.6    0.2    0.8      0.62   0.3 
-Energy use at 
-Cruise (kWh/mile):          1.6	   1.5    2.2      0.8    5.8
-Passenger Count:            4      5      3        2      2
-Probability of 
-fault per hour:             0.25   0.10   .05      .22    .61 
+![Alt text](https://github.com/JamesDarrellNielsen/eVTOL-Pwr-Sim/blob/main/images/assignmentSpecs.png)
 
 You will simulate using these vehicle for 3 hours. Of course your simulation should take much less time than that. 20 total vehicles should be deployed, and a random number of each type of vehicle should be used (with the total between all five types being 20). 
 There are only three chargers available for all 20 vehicles! A single charger can only be used by one vehicle at a time. Assume the chargers can charge the batteries in the Time to Charge time listed for each vehicle.  
