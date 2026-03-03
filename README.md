@@ -92,6 +92,9 @@ Charlie   4      0.625       100       0.666667    0      1200
 Delta     3      1.66667     150       0.2         1      900
 Echo      5      0.0344828   5.17241   0.133333    0      51.7241
 
+![Alt text](path/to/your/image.png)
+
+
 **** Appedix **** 
 eVTOL SIMULATION ASSIGNMENT:
 
