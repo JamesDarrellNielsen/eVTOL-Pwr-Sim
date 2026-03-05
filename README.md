@@ -88,6 +88,10 @@ Output results from one run:
 
 ![Alt text](https://github.com/JamesDarrellNielsen/eVTOL-Pwr-Sim/blob/main/images/EVTOLPwrSimResults.png)
 
+Test results:
+
+![Alt text](https://github.com/JamesDarrellNielsen/eVTOL-Pwr-Sim/blob/main/images/EVTOLPwrSimTestResults.png)
+
 **** Appedix **** 
 eVTOL SIMULATION ASSIGNMENT:
 
